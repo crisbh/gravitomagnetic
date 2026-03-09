@@ -240,7 +240,8 @@ def C_ell_Phi(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=parameter
         C_ell = cumulative_trapezoid(C_ell_int, x=z)[-1]
     else: 
         raise('Invalid selection of integration method, please choose between quad, simpson, cumsum or trapz')
-    return C_ell * 9/4 * pars['H0']**4 * pars['Omega_m']**2 / pars['c']**3
+    factor = 1.5 * pars['H0']**2 * pars['Omega_m'] / pars['c']**2  # Constant in kernel
+    return C_ell * factor * pars['c']
 
 
 def C_ell_B(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=parameters_sim, N_int=int(1e4), integr_method='simpson'):
@@ -254,7 +255,6 @@ def C_ell_B(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=parameters_
     z = z_grid[mask]
     chi = chi_grid[mask]
 
-    factor = 6*parameters_sim['H0']**2*parameters_sim['Omega_m']*(1+z)
     if z.size == 0:
         import warnings
         warnings.warn(f"C_ell_B: No valid z found for ell={ell}. Returning 0.")
@@ -266,7 +266,6 @@ def C_ell_B(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=parameters_
 
     C_ell_int *= (chi/chi_s-1)**2
     C_ell_int *= (1 + z)**2 / Hubble(z, pars)
-    C_ell_int /= factor ** 2
     C_ell_int *= 0.5        # 1/2 factor from P_q computation
 
     # integrate in z
@@ -293,7 +292,8 @@ def C_ell_B(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=parameters_
         C_ell = cumulative_trapezoid(C_ell_int, x=z)[-1]
     else: 
         raise('Invalid selection of integration method, please choose between quad, simpson, cumsum or trapz')
-    return (4/pars['c']**2) * C_ell * 9/4 * pars['H0']**4 * pars['Omega_m']**2 / pars['c']**3
+    factor = 1.5 * pars['H0']**2 * pars['Omega_m'] / pars['c']**2  # Constant in kernel
+    return C_ell * factor * pars['c']
 
 
 def C_ell_kSZ(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=parameters_sim, N_int=int(1e4), integr_method='simpson'):
@@ -355,7 +355,6 @@ def C_ell_B_X_kSZ(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=param
     z = z_grid[mask]
     chi = chi_grid[mask]
 
-    factor = 6*parameters_sim['H0']**2*parameters_sim['Omega_m']*(1+z)
     if z.size == 0:
         import warnings
         warnings.warn(f"C_ell_BxkSZ: No valid z found for ell={ell}. Returning 0.")
@@ -363,9 +362,8 @@ def C_ell_B_X_kSZ(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=param
 
     C_ell_int = Pk((ell/chi, z)) if Pk_evol else Pk(ell/chi)
     C_ell_int *= 3*(pars['H0']**2/pars['c']**3) * pars['Omega_m']*pars['SigmaT']*Mpc_2_m
-    C_ell_int *= n_ele(z)*(1+z)**3 * np.exp(-tau_optical_depth(z)) * (chi_s - chi)/(chi_s*chi)
+    C_ell_int *= n_ele(z) * np.exp(-tau_optical_depth(z)) * (chi_s - chi)/(chi_s*chi)
     C_ell_int /= Hubble(z, pars)
-    C_ell_int /= factor**2
     C_ell_int *= 0.5        # 1/2 factor from P_q computation
 
     # integrate in z
