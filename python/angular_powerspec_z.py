@@ -93,7 +93,7 @@ def main():
         return Pk_B * k**4
 
 
-    ell_grid = np.arange(int(1e2), int(1e4)+1)
+    ell_grid = np.logspace(2, 4, 40)
 
     C_ells_XY = {}
 
