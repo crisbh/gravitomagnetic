@@ -241,7 +241,7 @@ def C_ell_Phi(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=parameter
     else: 
         raise('Invalid selection of integration method, please choose between quad, simpson, cumsum or trapz')
     factor = 1.5 * pars['H0']**2 * pars['Omega_m'] / pars['c']**2  # Constant in kernel
-    return C_ell * factor * pars['c']
+    return C_ell * factor**2 * pars['c']
 
 
 def C_ell_B(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=parameters_sim, N_int=int(1e4), integr_method='simpson'):
@@ -293,7 +293,7 @@ def C_ell_B(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=parameters_
     else: 
         raise('Invalid selection of integration method, please choose between quad, simpson, cumsum or trapz')
     factor = 1.5 * pars['H0']**2 * pars['Omega_m'] / pars['c']**2  # Constant in kernel
-    return C_ell * factor * pars['c']
+    return C_ell * factor**2 * pars['c']
 
 
 def C_ell_kSZ(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=parameters_sim, N_int=int(1e4), integr_method='simpson'):
