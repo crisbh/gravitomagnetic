@@ -266,7 +266,7 @@ def C_ell_B(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=parameters_
 
     C_ell_int *= (chi/chi_s-1)**2
     C_ell_int *= (1 + z)**2 / Hubble(z, pars)
-    C_ell_int *= (ell/chi)**2  # Convert to Pq_perp
+    C_ell_int /= (ell/chi)**2  # Convert to Pq_perp
     C_ell_int *= 0.5          # 1/2 factor from P_q computation
 
     # integrate in z
@@ -283,7 +283,7 @@ def C_ell_B(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=parameters_
             val = Pk((ell/chi_x, x)) if Pk_evol else Pk(ell/chi_x)
             val *= (chi_x/chi_s-1)**2
             val *= (1 + x)**2 / Hubble(x, pars)
-            val *= (ell/chi_x)**2  # Convert to Pq_perp
+            val /= (ell/chi_x)**2  # Convert to Pq_perp
             val *= 0.5
             return val
         C_ell = quad(integrand, z[0], z[-1], limit=400)[0]
@@ -318,7 +318,7 @@ def C_ell_kSZ(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=parameter
     C_ell_int *= (pars['SigmaT']*Mpc_2_m*n_ele(z)/(1+z)*np.exp(-tau_optical_depth(z)))**2/pars['c']
     C_ell_int /= Hubble(z, pars)
     C_ell_int /= chi**2
-    C_ell_int *= (ell/chi)**2  # Convert to Pq_perp
+    C_ell_int /= (ell/chi)**2  # Convert to Pq_perp
     C_ell_int *= 0.5          # 1/2 factor from P_q computation
 
     # integrate in z
@@ -335,6 +335,7 @@ def C_ell_kSZ(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=parameter
             val *= (pars['SigmaT']*Mpc_2_m*n_ele(x)*(1+x)**2*np.exp(-tau_optical_depth(x)))**2/pars['c']
             val /= Hubble(x, pars)
             val /= chi_x**2
+            val /= (ell/chi)**2
             return val
         C_ell = quad(integrand, z[0], z[-1], limit=400)[0]
     elif integr_method == 'trapezoid':
@@ -368,7 +369,7 @@ def C_ell_B_X_kSZ(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=param
     C_ell_int *= 3*(pars['H0']**2/pars['c']**3) * pars['Omega_m']*pars['SigmaT']*Mpc_2_m
     C_ell_int *= n_ele(z) * np.exp(-tau_optical_depth(z)) * (chi_s - chi)/(chi_s*chi)
     C_ell_int /= Hubble(z, pars)
-    C_ell_int *= (ell/chi)**2  # Convert to Pq_perp
+    C_ell_int /= (ell/chi)**2  # Convert to Pq_perp
     C_ell_int *= 0.5          # 1/2 factor from P_q computation
 
     # integrate in z
@@ -385,6 +386,7 @@ def C_ell_B_X_kSZ(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=param
             val *= 3*(pars['H0']**2/pars['c']**3) * pars['Omega_m']*pars['SigmaT']*Mpc_2_m
             val *= n_ele(x)*(1+x)**3 * np.exp(-tau_optical_depth(x)) * (chi_s - chi_x)/(chi_s*chi_x)
             val /= Hubble(x, pars)
+            val /= (ell/chi)**2
             return val
         C_ell = quad(integrand, z[0], z[-1], limit=400)[0]
     elif integr_method == 'trapezoid':
