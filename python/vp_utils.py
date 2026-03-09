@@ -267,7 +267,7 @@ def C_ell_B(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=parameters_
     C_ell_int *= (chi/chi_s-1)**2
     C_ell_int *= (1 + z)**2 / Hubble(z, pars)
     C_ell_int /= (ell/chi)**2  # Convert to Pq_perp
-    C_ell_int *= 0.5          # 1/2 factor from P_q computation
+    C_ell_int *= 0.5           # 1/2 factor from P_q computation
 
     # integrate in z
     if integr_method == 'simpson':
