@@ -292,7 +292,7 @@ def C_ell_B(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=parameters_
         C_ell = cumulative_trapezoid(C_ell_int, x=z)[-1]
     else: 
         raise('Invalid selection of integration method, please choose between quad, simpson, cumsum or trapz')
-    factor = 1.5 * pars['H0']**2 * pars['Omega_m'] / pars['c']**2  # Constant in kernel
+    factor = 3 * pars['H0']**2 * pars['Omega_m'] / pars['c']**3  # Constant in kernel
     return C_ell * factor**2 * pars['c']
 
 
