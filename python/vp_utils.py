@@ -102,9 +102,11 @@ def build_cosmo_params_from_file(path, extra_defaults=None):
 
     return params
 
-parameters_sim = build_cosmo_params_from_file("~/nerding/gravitomagnetic/output_cosma/lcdm/parameters-usedvalues")
-# parameters_sim = build_cosmo_params_from_file("/home/vpedre/nerding/gravitomagnetic/output_cosma/frhs/parameters-usedvalues")
-# parameters_sim = build_cosmo_params_from_file("/home/vpedre/nerding/gravitomagnetic/output_cosma/ndgp/parameters-usedvalues")
+base_path = Path('~/nerding/gravitomagnetic/output_cosma').expanduser()
+
+parameters_sim = build_cosmo_params_from_file(base_path / "lcdm/parameters-usedvalues")
+# parameters_sim = build_cosmo_params_from_file(base_path / "frhs/parameters-usedvalues")
+# parameters_sim = build_cosmo_params_from_file(base_path / "ndgp/parameters-usedvalues")
 
 
 parameters_sim['w_de'] = -1

@@ -1,20 +1,18 @@
 import numpy as np
 from pathlib import Path
 from classy import Class
-import python.vp_utils as utils
+import vp_utils as utils
+import os
 
-base_path = Path('output_cosma')
+base_path = Path('~/nerding/gravitomagnetic/output_cosma').expanduser()
 
 models = ['lcdm', 'frhs', 'ndgp']
 surveys = ['LSST', 'Euclid']
 experiments = ['Planck', 'SO']
 
-pars_lcdm = utils.build_cosmo_params_from_file("~/nerding/gravitomagnetic/output_cosma/lcdm/parameters-usedvalues")
-pars_frhs = utils.build_cosmo_params_from_file("~/nerding/gravitomagnetic/output_cosma/frhs/parameters-usedvalues")
-pars_ndgp = utils.build_cosmo_params_from_file("~/nerding/gravitomagnetic/output_cosma/ndgp/parameters-usedvalues")
-
-# Find C_ell_TT from CLASS for the different models
-CLASS = {}
+pars_lcdm = utils.build_cosmo_params_from_file(base_path / "lcdm/parameters-usedvalues")
+pars_frhs = utils.build_cosmo_params_from_file(base_path / "frhs/parameters-usedvalues")
+pars_ndgp = utils.build_cosmo_params_from_file(base_path / "ndgp/parameters-usedvalues")
 
 # Cosmological parameters
 params_base = {
@@ -33,19 +31,34 @@ params_lcdm = params_base | {
     'Omega_b': pars_lcdm['Omega_b'],
 }
 
+params_frhs = params_base | {
+    'h': pars_frhs['h'],
+    'Omega_cdm': pars_frhs['Omega_m'] - pars_frhs['Omega_b'],
+    'Omega_b': pars_frhs['Omega_b'],
+}
 
-CLASS['lcdm'] = Class()
-CLASS['lcdm'].set(params_base)
-CLASS['lcdm'].compute()
+params_ndgp = params_base | {
+    'h': pars_ndgp['h'],
+    'Omega_cdm': pars_ndgp['Omega_m'] - pars_ndgp['Omega_b'],
+    'Omega_b': pars_ndgp['Omega_b'],
+}
 
-cl_tot = CLASS['lcdm'].raw_cl(10000)   # unlensed spectrum
-cl_lensed = CLASS['lcdm'].lensed_cl(10000)  # lensed spectrum
+# Find C_ell_TT from CLASS for the different models
+CLASS = {}
+C_ell_TT = {}
+ells = {}
 
-ells = cl_tot['ell']
-Cl_tt_tot = cl_tot['tt']  # unlensed tt power spectrum
+for m in models:
+    CLASS[m] = Class()
+    CLASS[m].set(params_base)
+    CLASS[m].compute()
 
-ells_lensed = cl_lensed['ell']
-Cl_tt_lensed = cl_lensed['tt']  # lensed tt power spectrum
+    c_ell_unlensed = CLASS[m].raw_cl(10000)   # unlensed spectrum
+    # cl_lensed = CLASS[m].lensed_cl(10000)  # lensed spectrum
+
+    ells[m] = c_ell_unlensed['ell']
+    C_ell_TT[m] = c_ell_unlensed['tt']  # unlensed tt power spectrum
+
 
 # First define the survey and experiment parmeters
 pars_surv, pars_exp = {}, {}
@@ -69,6 +82,7 @@ pars_exp['SO']['theta_fwhm'] = 1.4
 pars_exp['SO']['Delta_T'] = 6
 pars_exp['SO']['f_sky'] = 0.4
 pars_exp['SO']['T_bar'] = 2.7E6
+
 
 # Useful functions for SNR
 def noise_convergence(pars_surv):
@@ -94,17 +108,18 @@ def Cov(ell_list, C_ell_kappaB, C_ell_TT, C_ell_kappaGR, pars_surv, pars_exp):
     contributions = C_ell_kappaB[ell_list]**2 + (C_ell_TT[ell_list] + noise_temperature(ell_list, pars_exp)*(C_ell_kappaGR[ell_list] + noise_convergence(pars_surv)))
     return contributions * factor
 
+
 def SNR(ell_list, C_ell_kappaB, C_ell_TT, C_ell_kappaGR, pars_surv, pars_exp):
-    return np.sqrt(C_ell_kappaB[list]**2 / Cov(ell_list, C_ell_kappaB, C_ell_TT, C_ell_kappaGR, pars_surv, pars_exp))
+    return np.sqrt(C_ell_kappaB[ell_list]**2 / Cov(ell_list, C_ell_kappaB, C_ell_TT, C_ell_kappaGR, pars_surv, pars_exp))
 
 
 def main():
     for m in models:
-        path_C_ell = base_path / "m"
+        path_C_ell = base_path / m
         C_ell_XY = np.load(path_C_ell / "C_ells_XY.npy", allow_pickle=True).item()
-        ell_grid = np.load(path_C_ell / "m" / "ell_grid.npy")
+        ell_grid = np.load(path_C_ell / "ell_grid.npy")
 
-        SNR(ell_grid, C_ell_XY['B'], C_ell_TT, C_ell_XY['Phi'], pars_surv['LSST'], pars_exp['SO'])
+        SNR(ell_grid, C_ell_XY['B'], C_ell_TT[m][ell_grid], C_ell_XY['Phi'], pars_surv['LSST'], pars_exp['SO'])
 
         np.save(path_C_ell / "SNR.npy", SNR)
 
