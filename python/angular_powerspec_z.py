@@ -23,11 +23,11 @@ def parse_args():
     return parser.parse_args()
 
 
-def _load_metadata(in_dir):
-    meta_path = Path(in_dir) / "snapshot_metadata.json"
-    if not meta_path.exists():
-        return {}
-    return json.loads(meta_path.read_text())
+# def _load_metadata(in_dir):
+#     meta_path = Path(in_dir) / "snapshot_metadata.json"
+#     if not meta_path.exists():
+#         return {}
+#     return json.loads(meta_path.read_text())
 
 
 def main():
@@ -40,28 +40,35 @@ def main():
     z_list = []
     Pkm_list = []
     Pk_curl_list = []
+    km_list = []
+    k_curl_list = []
 
     for i in range(27):
-        snap_dir = in_dir / f"snap_{i:03d}"
-        
-        meta = _load_metadata(snap_dir)
-        z = float(str(meta.get("redshift")).strip())
-        factor = 6*parameters_sim['H0']**2*parameters_sim['Omega_m']*(1+z) 
+        data_m = np.load(in_dir / f"Pk_matter/{i:03d}.npy", allow_pickle=True).item()
+        data_q = np.load(in_dir / f"Pk_curl/{i:03d}.npy", allow_pickle=True).item()
 
-        k_m = np.load(snap_dir / "k_m.npy")
-        Pk_m = np.load(snap_dir / "Pk_m.npy")
-        k_curl = np.load(snap_dir / "k_curl.npy")
-        Pk_curl = np.load(snap_dir / "Pk_curl.npy")
+        km_list.append(data_m["k"])
+        Pkm_list.append(data_m["Pk"])
 
-        z_list.append(z)
-        Pkm_list.append(Pk_m)
-        Pk_curl_list.append(Pk_curl)
+        k_curl_list.append(data_q["k"])
+        Pk_curl_list.append(data_q["Pcurl"])
+
+        z_list.append(data_m["z"])
 
     # Sort redshift!
     z_order = np.argsort(z_list)
     z_grid = np.array(z_list)[z_order]
     Pkm_grid = np.array(Pkm_list)[z_order, :]
     Pk_curl_grid = np.array(Pk_curl_list)[z_order, :]
+
+    for k in km_list[1:]:
+        np.testing.assert_allclose(k, km_list[0])
+
+    for k in k_curl_list[1:]:
+        np.testing.assert_allclose(k, k_curl_list[0])
+
+    k_m = km_list[0]
+    k_curl = k_curl_list[0]
 
     logk_m = np.log(k_m)
     logk_c = np.log(k_curl)
