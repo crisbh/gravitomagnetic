@@ -103,14 +103,18 @@ def noise_temperature(ell, pars_exp):
 
 
 def Cov(ell_list, C_ell_kappaB, C_ell_TT, C_ell_kappaGR, pars_surv, pars_exp):
-    Delta_ell = np.diff(ell_list)
+    logell = np.log10(ell_list)
+    dlog = logell[1] - logell[0]
+    edges = 10**(np.r_[logell[0] - dlog/2, 0.5*(logell[:-1] + logell[1:]), logell[-1] + dlog/2])
+    Delta_ell = np.diff(edges)
+
     factor = Delta_ell * pars_surv['f_sky'] * (2*ell_list + 1)
-    contributions = C_ell_kappaB[ell_list]**2 + (C_ell_TT[ell_list] + noise_temperature(ell_list, pars_exp)*(C_ell_kappaGR[ell_list] + noise_convergence(pars_surv)))
+    contributions = C_ell_kappaB**2 + (C_ell_TT + noise_temperature(ell_list, pars_exp)*(C_ell_kappaGR + noise_convergence(pars_surv)))
     return contributions * factor
 
 
 def SNR(ell_list, C_ell_kappaB, C_ell_TT, C_ell_kappaGR, pars_surv, pars_exp):
-    return np.sqrt(C_ell_kappaB[ell_list]**2 / Cov(ell_list, C_ell_kappaB, C_ell_TT, C_ell_kappaGR, pars_surv, pars_exp))
+    return np.sqrt(C_ell_kappaB**2 / Cov(ell_list, C_ell_kappaB, C_ell_TT, C_ell_kappaGR, pars_surv, pars_exp))
 
 
 def main():
@@ -118,10 +122,11 @@ def main():
         path_C_ell = base_path / m
         C_ell_XY = np.load(path_C_ell / "C_ells_XY.npy", allow_pickle=True).item()
         ell_grid = np.load(path_C_ell / "ell_grid.npy")
+        ell_idx = np.round(ell_grid).astype(int)
 
-        SNR(ell_grid, C_ell_XY['B'], C_ell_TT[m][ell_grid], C_ell_XY['Phi'], pars_surv['LSST'], pars_exp['SO'])
+        signal_to_noise = SNR(ell_idx, C_ell_XY['B'], C_ell_TT[m][ell_idx], C_ell_XY['Phi'], pars_surv['LSST'], pars_exp['SO'])
 
-        np.save(path_C_ell / "SNR.npy", SNR)
+        np.save(path_C_ell / "SNR.npy", signal_to_noise)
 
 if __name__ == "__main__":
     main()
