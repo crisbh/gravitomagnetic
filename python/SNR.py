@@ -1,8 +1,8 @@
 import numpy as np
 from pathlib import Path
 from classy import Class
-import vp_utils as utils
-import os
+import pandas as pd
+
 
 base_path = Path('~/nerding/gravitomagnetic/output_cosma').expanduser()
 
@@ -10,37 +10,47 @@ models = ['lcdm', 'frhs', 'ndgp']
 surveys = ['LSST', 'Euclid']
 experiments = ['Planck', 'SO']
 
-pars_lcdm = utils.build_cosmo_params_from_file(base_path / "lcdm/parameters-usedvalues")
-pars_frhs = utils.build_cosmo_params_from_file(base_path / "frhs/parameters-usedvalues")
-pars_ndgp = utils.build_cosmo_params_from_file(base_path / "ndgp/parameters-usedvalues")
+col_names_frhs = ['Omega_m', 'S8', 'h', '|f_R0|', 'sigma8', 'A_s', 'B0']
+col_names_ndgp = ['Omega_m', 'S8', 'h', 'H0rc', 'sigma8', 'A_s', 'B0']
+
+df_frhs = pd.read_csv(base_path / 'frhs/Nodes_Omm-S8-h-fR0-sigma8-As-B0_LHCrandommaximin_Seed1_Nodes50_Dim4_AddFidTrue_extended.dat', sep=r'\s+', skiprows=1, names=col_names_frhs, skipfooter=2, engine='python')
+df_ndgp = pd.read_csv(base_path / 'ndgp/Nodes_Omm-S8-h-H0rc-sigma8-As-B0_LHCrandommaximin_Seed1_Nodes50_Dim4_AddFidTrue_extended_modified.dat', sep=r'\s+', skiprows=1, names=col_names_ndgp, skipfooter=2, engine='python')
+
+df_frhs[['A_s_1', 'A_s_2']] = df_frhs['A_s'].str.split('/', expand=True).astype(float)
+df_ndgp[['A_s_1', 'A_s_2']] = df_ndgp['A_s'].str.split('/', expand=True).astype(float)
+
+df_frhs = df_frhs.drop(columns=['A_s'])
+df_ndgp = df_ndgp.drop(columns=['A_s'])
+
+Omega_b = 0.049199
+n_s = 0.9652
 
 # Cosmological parameters
 params_base = {
     'output': 'tCl,sCl,lCl,mPk',
-    'A_s': 2.1e-9,
-    'n_s': 0.965,
-    'tau_reio': 0.06,
+    'Omega_b': Omega_b,
+    'n_s': n_s,
     'lensing': 'yes',
     'l_switch_limber': 50,
     'l_max_scalars': 10000
 }
 
 params_lcdm = params_base | {
-    'h': pars_lcdm['h'],
-    'Omega_cdm': pars_lcdm['Omega_m'] - pars_lcdm['Omega_b'],
-    'Omega_b': pars_lcdm['Omega_b'],
+    'h': df_frhs['h'][0],
+    'Omega_cdm': df_frhs['Omega_m'][0] - Omega_b,
+    'A_s': df_frhs['A_s_2'][0],
 }
 
 params_frhs = params_base | {
-    'h': pars_frhs['h'],
-    'Omega_cdm': pars_frhs['Omega_m'] - pars_frhs['Omega_b'],
-    'Omega_b': pars_frhs['Omega_b'],
+    'h': df_frhs['h'][6],
+    'Omega_cdm': df_frhs['Omega_m'][6] - Omega_b,
+    'A_s': df_frhs['A_s_2'][6],
 }
 
 params_ndgp = params_base | {
-    'h': pars_ndgp['h'],
-    'Omega_cdm': pars_ndgp['Omega_m'] - pars_ndgp['Omega_b'],
-    'Omega_b': pars_ndgp['Omega_b'],
+    'h': df_ndgp['h'][6],
+    'Omega_cdm': df_ndgp['Omega_m'][6] - Omega_b,
+    'A_s': df_ndgp['A_s_2'][6],
 }
 
 # Find C_ell_TT from CLASS for the different models
@@ -48,16 +58,22 @@ CLASS = {}
 C_ell_TT = {}
 ells = {}
 
+params_by_model = {
+    'lcdm': params_lcdm,
+    'frhs': params_frhs,
+    'ndgp': params_ndgp,
+}
+
 for m in models:
     CLASS[m] = Class()
-    CLASS[m].set(params_base)
+    CLASS[m].set(params_by_model[m])
     CLASS[m].compute()
 
-    c_ell_unlensed = CLASS[m].raw_cl(10000)   # unlensed spectrum
-    # cl_lensed = CLASS[m].lensed_cl(10000)  # lensed spectrum
+    # c_ell = CLASS[m].raw_cl(10000)   # unlensed spectrum
+    c_ell = CLASS[m].lensed_cl(10000)  # lensed spectrum
 
-    ells[m] = c_ell_unlensed['ell']
-    C_ell_TT[m] = c_ell_unlensed['tt']  # unlensed tt power spectrum
+    ells[m] = c_ell['ell']
+    C_ell_TT[m] = c_ell['tt']  # unlensed tt power spectrum
 
 
 # First define the survey and experiment parmeters
@@ -94,10 +110,10 @@ def noise_convergence(pars_surv):
 
 
 def noise_temperature(ell, pars_exp):
-    FWHM = pars_exp['theta_fwhm']
-    FWHM/= 60.                       # arcmin to deg
-    FWHM*= np.pi/180.                # deg to rad
-    factor = (pars_exp['Delta_T']/pars_exp['T_bar'])**2
+    arcmin_to_rad = np.pi / (180*60)
+    FWHM = pars_exp['theta_fwhm'] * arcmin_to_rad
+    Delta_T = pars_exp['Delta_T'] * arcmin_to_rad
+    factor = (Delta_T/pars_exp['T_bar'])**2
     arg_exp = ell**2 * FWHM**2/(8*np.log(2))
     return factor * np.exp(arg_exp)
 
@@ -109,12 +125,12 @@ def Cov(ell_list, C_ell_kappaB, C_ell_TT, C_ell_kappaGR, pars_surv, pars_exp):
     Delta_ell = np.diff(edges)
 
     factor = Delta_ell * pars_surv['f_sky'] * (2*ell_list + 1)
-    contributions = C_ell_kappaB**2 + (C_ell_TT + noise_temperature(ell_list, pars_exp)*(C_ell_kappaGR + noise_convergence(pars_surv)))
-    return contributions * factor
+    contributions = C_ell_kappaB**2 + (C_ell_TT + noise_temperature(ell_list, pars_exp))*(C_ell_kappaGR + noise_convergence(pars_surv))
+    return contributions / factor
 
 
-def SNR(ell_list, C_ell_kappaB, C_ell_TT, C_ell_kappaGR, pars_surv, pars_exp):
-    return np.sqrt(C_ell_kappaB**2 / Cov(ell_list, C_ell_kappaB, C_ell_TT, C_ell_kappaGR, pars_surv, pars_exp))
+def SNR(ell_list, C_ell_kappaB, C_ell_TT, C_ell_kappaGR, survey, experiment):
+    return np.sqrt(C_ell_kappaB**2 / Cov(ell_list, C_ell_kappaB, C_ell_TT, C_ell_kappaGR, pars_surv[survey], pars_exp[experiment]))
 
 
 def main():
@@ -124,7 +140,7 @@ def main():
         ell_grid = np.load(path_C_ell / "ell_grid.npy")
         ell_idx = np.round(ell_grid).astype(int)
 
-        signal_to_noise = SNR(ell_idx, C_ell_XY['B'], C_ell_TT[m][ell_idx], C_ell_XY['Phi'], pars_surv['LSST'], pars_exp['SO'])
+        signal_to_noise = SNR(ell_grid, C_ell_XY['B'], C_ell_TT[m][ell_idx], C_ell_XY['Phi'], 'LSST', 'SO')
 
         np.save(path_C_ell / "SNR.npy", signal_to_noise)
 
