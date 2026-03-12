@@ -24,13 +24,6 @@ def parse_args():
     return parser.parse_args()
 
 
-# def _load_metadata(in_dir):
-#     meta_path = Path(in_dir) / "snapshot_metadata.json"
-#     if not meta_path.exists():
-#         return {}
-#     return json.loads(meta_path.read_text())
-
-
 def main():
     args = parse_args()
     in_dir = Path(args.in_dir)

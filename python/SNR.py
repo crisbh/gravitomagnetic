@@ -2,10 +2,23 @@ import numpy as np
 from pathlib import Path
 from classy import Class
 import pandas as pd
+import argparse
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Compute angular power spectrum from a snapshot using Pylians3."
+    )
+    parser.add_argument("--in-dir", type=str, required=True, help="Path containing .npy files and metadata.")
+    parser.add_argument("--out-dir", type=str, default="outputs", help="Output directory for .npy files.")
+    parser.add_argument("--z_source", type=float, required=True, help="Maximum redshift for integration")
+    return parser.parse_args()
+
+args = parse_args()
 
 arcmin_to_rad = np.pi / (180*60) # Unit conversion
 
-base_path = Path('~/nerding/gravitomagnetic/output_cosma').expanduser()
+base_path = Path(args.in_dir).expanduser()
 
 models = ['lcdm', 'frhs', 'ndgp']
 surveys = ['LSST', 'Euclid']
@@ -137,13 +150,13 @@ def SNR(ell_list, C_ell_kappaB, C_ell_TT, C_ell_kappaGR, survey, experiment):
 def main():
     for m in models:
         path_C_ell = base_path / m
-        C_ell_XY = np.load(path_C_ell / "C_ells_XY.npy", allow_pickle=True).item()
-        ell_grid = np.load(path_C_ell / "ell_grid.npy")
+        C_ell_XY = np.load(path_C_ell / 'C_ells' / f"C_ells_XY_z={args.z_source}.npy", allow_pickle=True).item()
+        ell_grid = np.load(path_C_ell / 'C_ells' / f"ell_grid_z={args.z_source}.npy")
         ell_idx = np.round(ell_grid).astype(int)
 
         signal_to_noise = SNR(ell_grid, C_ell_XY['B'], C_ell_TT[m][ell_idx], C_ell_XY['Phi'], 'LSST', 'SO')
 
-        np.save(path_C_ell / "SNR.npy", signal_to_noise)
+        np.save(path_C_ell / f"SNRs/SNR_z={args.z_source}.npy", signal_to_noise)
 
 if __name__ == "__main__":
     main()
