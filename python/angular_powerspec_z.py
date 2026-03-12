@@ -18,8 +18,9 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Compute angular power spectrum from a snapshot using Pylians3."
     )
-    parser.add_argument("--in-dir", required=True, help="Path containing .npy files and metadata.")
-    parser.add_argument("--out-dir", default="outputs", help="Output directory for .npy files.")
+    parser.add_argument("--in-dir", type=str, required=True, help="Path containing .npy files and metadata.")
+    parser.add_argument("--out-dir", type=str, default="outputs", help="Output directory for .npy files.")
+    parser.add_argument("--z_source", type=float, required=True, help="Maximum redshift for integration")
     return parser.parse_args()
 
 
@@ -109,7 +110,7 @@ def main():
 
     for idx, ell in enumerate(ell_grid):
         C_ells_XY['Phi'][idx] = utils.C_ell_XY(
-            z_s=3,
+            z_s=args.z_source,
             ell=ell,
             z_min=1e-5,
             kmin=k_m[0],
@@ -120,7 +121,7 @@ def main():
         )
 
         C_ells_XY['kSZ'][idx] = utils.C_ell_XY(
-            z_s=3,
+            z_s=args.z_source,
             ell=ell,
             z_min=1e-5,
             kmin=k_curl[0],
@@ -131,7 +132,7 @@ def main():
         )
 
         C_ells_XY['B'][idx] = utils.C_ell_XY(
-            z_s=3,
+            z_s=args.z_source,
             ell=ell,
             z_min=1e-5,
             kmin=k_curl[0],
@@ -142,7 +143,7 @@ def main():
         )
 
         C_ells_XY['B_X_kSZ'][idx] = utils.C_ell_XY(
-            z_s=3,
+            z_s=args.z_source,
             ell=ell,
             z_min=1e-5,
             kmin=k_curl[0],
@@ -152,8 +153,8 @@ def main():
             Pk_evol=True,
         )
     
-    np.save(out / "ell_grid.npy", ell_grid)
-    np.save(out / "C_ells_XY.npy", C_ells_XY)
+    np.save(out / f"C_ells/ell_grid_z={args.z_source}.npy", ell_grid)
+    np.save(out / f"C_ells/C_ells_XY_z={args.z_source}.npy", C_ells_XY)
     
 if __name__ == "__main__":
     main()

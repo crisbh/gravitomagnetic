@@ -3,6 +3,7 @@ from pathlib import Path
 from classy import Class
 import pandas as pd
 
+arcmin_to_rad = np.pi / (180*60) # Unit conversion
 
 base_path = Path('~/nerding/gravitomagnetic/output_cosma').expanduser()
 
@@ -25,7 +26,8 @@ df_ndgp = df_ndgp.drop(columns=['A_s'])
 Omega_b = 0.049199
 n_s = 0.9652
 
-# Cosmological parameters
+# Find C_ell_TT from CLASS for the different models
+## Cosmological parameters
 params_base = {
     'output': 'tCl,sCl,lCl,mPk',
     'Omega_b': Omega_b,
@@ -53,7 +55,8 @@ params_ndgp = params_base | {
     'A_s': df_ndgp['A_s_2'][6],
 }
 
-# Find C_ell_TT from CLASS for the different models
+
+## CLASS run
 CLASS = {}
 C_ell_TT = {}
 ells = {}
@@ -76,7 +79,7 @@ for m in models:
     C_ell_TT[m] = c_ell['tt']  # unlensed tt power spectrum
 
 
-# First define the survey and experiment parmeters
+# Define the survey and experiment parmeters
 pars_surv, pars_exp = {}, {}
 pars_surv['Euclid'], pars_surv['LSST'] = {}, {}
 pars_exp['Planck'], pars_exp['SO'] = {}, {}
@@ -103,14 +106,12 @@ pars_exp['SO']['T_bar'] = 2.7E6
 # Useful functions for SNR
 def noise_convergence(pars_surv):
     sigma_e = pars_surv['sigma_e']
-    n_gal = pars_surv['n_gal']
-    n_gal*= 60.**2          # galaxies per deg^2
-    n_gal*=(180./np.pi)**2  # galaxies per rad^2
+    n_gal = pars_surv['n_gal']  # In 1/arcmin^2
+    n_gal /= arcmin_to_rad**2   # convert to 1/radians^2
     return sigma_e**2/n_gal
 
 
 def noise_temperature(ell, pars_exp):
-    arcmin_to_rad = np.pi / (180*60)
     FWHM = pars_exp['theta_fwhm'] * arcmin_to_rad
     Delta_T = pars_exp['Delta_T'] * arcmin_to_rad
     factor = (Delta_T/pars_exp['T_bar'])**2
