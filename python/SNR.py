@@ -90,6 +90,7 @@ for m in models:
 
     ells[m] = c_ell['ell']
     C_ell_TT[m] = c_ell['tt']  # unlensed tt power spectrum
+    np.save(base_path / m / "Cl_TT.npy", C_ell_TT[m])
 
 
 # Define the survey and experiment parmeters
@@ -132,7 +133,7 @@ def noise_temperature(ell, pars_exp):
     return factor * np.exp(arg_exp)
 
 
-def Cov(ell_list, C_ell_kappaB, C_ell_TT, C_ell_kappaGR, C_ell_kSZ, pars_surv, pars_exp):
+def Cov(ell_list, C_ell_kappaB, C_ell_TT, C_ell_kappaWL, C_ell_kSZ, pars_surv, pars_exp):
     ell_list = np.logspace(2, 4, 40)
     logell = np.log10(ell_list)
     dlog = logell[1] - logell[0]
@@ -140,12 +141,12 @@ def Cov(ell_list, C_ell_kappaB, C_ell_TT, C_ell_kappaGR, C_ell_kSZ, pars_surv, p
     Delta_ell = np.diff(edges)
 
     factor = Delta_ell * pars_surv['f_sky'] * (2*ell_list + 1)
-    contributions = C_ell_kappaB**2 + (C_ell_TT + C_ell_kSZ + noise_temperature(ell_list, pars_exp))*(C_ell_kappaGR + noise_convergence(pars_surv))
+    contributions = C_ell_kappaB**2 + (C_ell_TT + C_ell_kSZ + noise_temperature(ell_list, pars_exp))*(C_ell_kappaWL + C_ell_kappaB + noise_convergence(pars_surv))
     return contributions / factor
 
 
-def SNR(ell_list, C_ell_kappaB, C_ell_TT, C_ell_kappaGR, C_ell_kSZ, survey, experiment):
-    return np.sqrt(C_ell_kappaB**2 / Cov(ell_list, C_ell_kappaB, C_ell_TT, C_ell_kappaGR, C_ell_kSZ, pars_surv[survey], pars_exp[experiment]))
+def SNR(ell_list, C_ell_kappaB, C_ell_TT, C_ell_kappaWL, C_ell_kSZ, survey, experiment):
+    return np.sqrt(C_ell_kappaB**2 / Cov(ell_list, C_ell_kappaB, C_ell_TT, C_ell_kappaWL, C_ell_kSZ, pars_surv[survey], pars_exp[experiment]))
 
 
 def main():
@@ -158,6 +159,6 @@ def main():
         signal_to_noise = SNR(ell_grid, C_ell_XY['B'], C_ell_TT[m][ell_idx], C_ell_XY['Phi'], C_ell_XY['kSZ'], 'LSST', 'SO')
 
         np.save(path_C_ell / f"SNRs/SNR_z={args.z_source}.npy", signal_to_noise)
-
+        
 if __name__ == "__main__":
     main()
