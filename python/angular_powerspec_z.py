@@ -12,8 +12,6 @@ from scipy.interpolate import RegularGridInterpolator, interp1d
 
 import vp_utils as utils
 
-parameters_sim = utils.parameters_sim
-
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Compute angular power spectrum from a snapshot using Pylians3."

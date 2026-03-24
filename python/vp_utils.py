@@ -102,7 +102,7 @@ def build_cosmo_params_from_file(path, extra_defaults=None):
 
     return params
 
-base_path = Path('~/nerding/gravitomagnetic/output_cosma').expanduser()
+base_path = Path('~/nerding/gravitomagnetic/output').expanduser()
 
 parameters_sim = build_cosmo_params_from_file(base_path / "lcdm/parameters-usedvalues")
 # parameters_sim = build_cosmo_params_from_file(base_path / "frhs/parameters-usedvalues")

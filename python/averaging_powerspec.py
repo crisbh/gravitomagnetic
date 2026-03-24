@@ -2,7 +2,7 @@ import numpy as np
 from pathlib import Path
 import json
 
-base_path = Path('output_cosma')
+base_path = Path('output')
 
 models = ['lcdm', 'frhs', 'ndgp']
 
