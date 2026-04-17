@@ -10,7 +10,6 @@ import numpy as np
 from pathlib import Path
 
 
-from pylab import *
 import Pk_library as PKL
 
 import vp_utils as utils
