@@ -28,6 +28,7 @@ def main():
     
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
+    (out / "C_ells").mkdir(parents=True, exist_ok=True)
 
     z_list = []
     Pkm_list = []
@@ -35,7 +36,8 @@ def main():
     km_list = []
     k_curl_list = []
 
-    for i in range(25):
+    n_snaps = len(sorted((in_dir / "Pk_matter").glob("*.npy")))
+    for i in range(n_snaps):
         data_m = np.load(in_dir / f"Pk_matter/{i:03d}.npy", allow_pickle=True).item()
         data_q = np.load(in_dir / f"Pk_curl/{i:03d}.npy", allow_pickle=True).item()
 
