@@ -243,8 +243,8 @@ def C_ell_Phi(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=parameter
         C_ell = cumulative_simpson(C_ell_int, x=z)[-1]
     elif integr_method == 'cum_trapezoid':
         C_ell = cumulative_trapezoid(C_ell_int, x=z)[-1]
-    else: 
-        raise('Invalid selection of integration method, please choose between quad, simpson, cumsum or trapz')
+    else:
+        raise ValueError('Invalid selection of integration method, please choose between quad, simpson, cumsum or trapz')
     factor = 1.5 * pars['H0']**2 * pars['Omega_m'] / pars['c']**2  # Constant in kernel
     return C_ell * factor**2 * pars['c']
 
@@ -298,8 +298,8 @@ def C_ell_B(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=parameters_
         C_ell = cumulative_simpson(C_ell_int, x=z)[-1]
     elif integr_method == 'cum_trapezoid':
         C_ell = cumulative_trapezoid(C_ell_int, x=z)[-1]
-    else: 
-        raise('Invalid selection of integration method, please choose between quad, simpson, cumsum or trapz')
+    else:
+        raise ValueError('Invalid selection of integration method, please choose between quad, simpson, cumsum or trapz')
     factor = 3 * pars['H0']**2 * pars['Omega_m'] / pars['c']**3  # Constant in kernel
     return C_ell * factor**2 * pars['c']
 
@@ -337,10 +337,10 @@ def C_ell_kSZ(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=parameter
         def integrand(x):
             chi_x = chi_of_z(x)
             val = Pk((ell/chi_x, x)) if Pk_evol else Pk(ell/chi_x)
-            val *= (pars['SigmaT']*Mpc_2_m*n_ele(x)*(1+x)**2*np.exp(-tau_optical_depth(x)))**2/pars['c']
+            val *= (pars['SigmaT']*Mpc_2_m*n_ele(x)/(1+x)*np.exp(-tau_optical_depth(x)))**2/pars['c']
             val /= Hubble(x, pars)
             val /= chi_x**2
-            val /= (ell/chi)**2
+            val /= (ell/chi_x)**2
             return val
         C_ell = quad(integrand, z[0], z[-1], limit=400)[0]
     elif integr_method == 'trapezoid':
@@ -349,8 +349,8 @@ def C_ell_kSZ(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=parameter
         C_ell = cumulative_simpson(C_ell_int, x=z)[-1]
     elif integr_method == 'cum_trapezoid':
         C_ell = cumulative_trapezoid(C_ell_int, x=z)[-1]
-    else: 
-        raise('Invalid selection of integration method, please choose between quad, simpson, cumsum or trapz')
+    else:
+        raise ValueError('Invalid selection of integration method, please choose between quad, simpson, cumsum or trapz')
     return C_ell
 
 
@@ -389,9 +389,9 @@ def C_ell_B_X_kSZ(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=param
             chi_x = chi_of_z(x)
             val = Pk((ell/chi_x, x)) if Pk_evol else Pk(ell/chi_x)
             val *= 3*(pars['H0']**2/pars['c']**3) * pars['Omega_m']*pars['SigmaT']*Mpc_2_m
-            val *= n_ele(x)*(1+x)**3 * np.exp(-tau_optical_depth(x)) * (chi_s - chi_x)/(chi_s*chi_x)
+            val *= n_ele(x) * np.exp(-tau_optical_depth(x)) * (chi_s - chi_x)/(chi_s*chi_x)
             val /= Hubble(x, pars)
-            val /= (ell/chi)**2
+            val /= (ell/chi_x)**2
             return val
         C_ell = quad(integrand, z[0], z[-1], limit=400)[0]
     elif integr_method == 'trapezoid':
@@ -400,8 +400,8 @@ def C_ell_B_X_kSZ(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=param
         C_ell = cumulative_simpson(C_ell_int, x=z)[-1]
     elif integr_method == 'cum_trapezoid':
         C_ell = cumulative_trapezoid(C_ell_int, x=z)[-1]
-    else: 
-        raise('Invalid selection of integration method, please choose between quad, simpson, cumsum or trapz')
+    else:
+        raise ValueError('Invalid selection of integration method, please choose between quad, simpson, cumsum or trapz')
     return C_ell
 
 
