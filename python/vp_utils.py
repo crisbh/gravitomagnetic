@@ -102,11 +102,12 @@ def build_cosmo_params_from_file(path, extra_defaults=None):
 
     return params
 
+import os as _os
 base_path = Path('~/nerding/gravitomagnetic/output').expanduser()
 
-parameters_sim = build_cosmo_params_from_file(base_path / "lcdm/parameters-usedvalues")
-# parameters_sim = build_cosmo_params_from_file(base_path / "frhs/parameters-usedvalues")
-# parameters_sim = build_cosmo_params_from_file(base_path / "ndgp/parameters-usedvalues")
+_default_params = str(base_path / "lcdm/parameters-usedvalues")
+_params_file = Path(_os.environ.get("VP_PARAMS_FILE", _default_params))
+parameters_sim = build_cosmo_params_from_file(_params_file)
 
 
 parameters_sim['w_de'] = -1
