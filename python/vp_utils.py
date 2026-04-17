@@ -341,6 +341,9 @@ def C_ell_kSZ(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=parameter
             val /= Hubble(x, pars)
             val /= chi_x**2
             val /= (ell/chi_x)**2
+            # Add missing 1/2 factor from P_q computation
+            # Since C_ell_int is not used here unlike previous methods
+            val *= 0.5
             return val
         C_ell = quad(integrand, z[0], z[-1], limit=400)[0]
     elif integr_method == 'trapezoid':
@@ -392,6 +395,9 @@ def C_ell_B_X_kSZ(z_s, ell, kmin, kmax, Pk, z_min=1e-5, Pk_evol=True, pars=param
             val *= n_ele(x) * np.exp(-tau_optical_depth(x)) * (chi_s - chi_x)/(chi_s*chi_x)
             val /= Hubble(x, pars)
             val /= (ell/chi_x)**2
+            # Add missing 1/2 factor from P_q computation
+            # Since C_ell_int is not used here unlike previous methods
+            val *= 0.5
             return val
         C_ell = quad(integrand, z[0], z[-1], limit=400)[0]
     elif integr_method == 'trapezoid':
