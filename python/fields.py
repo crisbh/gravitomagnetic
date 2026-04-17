@@ -10,7 +10,6 @@ import numpy as np
 from pathlib import Path
 
 
-from pylab import *
 import MAS_library as MASL
 
 import gc
@@ -76,7 +75,7 @@ def main():
     qz = np.zeros((args.ngrid, args.ngrid, args.ngrid), dtype=np.float32)
 
     MASL.MA(pos, qx, box_size, args.mas, vel[:,0].astype(np.float32), verbose=args.verbose)
-    qx /= np.mean(rho_mean)
+    qx /= rho_mean
 
     np.save(out / "momentum_x.npy", qx)
 
@@ -84,7 +83,7 @@ def main():
     gc.collect()
 
     MASL.MA(pos, qy, box_size, args.mas, vel[:,1].astype(np.float32), verbose=args.verbose)
-    qy /= np.mean(rho_mean)
+    qy /= rho_mean
 
     np.save(out / "momentum_y.npy", qy)
 
@@ -92,7 +91,7 @@ def main():
     gc.collect()
 
     MASL.MA(pos, qz, box_size, args.mas, vel[:,2].astype(np.float32), verbose=args.verbose)
-    qz /= np.mean(rho_mean)
+    qz /= rho_mean
 
     np.save(out / "momentum_z.npy", qz)
 
