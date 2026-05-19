@@ -188,9 +188,12 @@ def plot_ratio(data, z_sources, models, quantities, out_dir, show):
                     continue
                 d = data[model][z]
                 d_lcdm = data["lcdm"][z]
-                ratio = np.abs(d[qty]) / np.interp(
-                    d["ell"], d_lcdm["ell"], np.abs(d_lcdm[qty])
-                )
+                lcdm_val = np.interp(d["ell"], d_lcdm["ell"], np.abs(d_lcdm[qty]))
+                # _compute_C_ell returns 0 at ells outside the valid k-range,
+                # which would produce inf/NaN here. NaN out those points so the
+                # plot draws a gap instead of a meaningless spike.
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    ratio = np.where(lcdm_val > 0, np.abs(d[qty]) / lcdm_val, np.nan)
                 ax.semilogx(
                     d["ell"], ratio, ls=MODEL_LS[model], color=z_colors[z], alpha=0.9
                 )
