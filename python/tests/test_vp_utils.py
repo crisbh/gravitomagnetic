@@ -179,6 +179,20 @@ def test_c_ell_baseline_unchanged(fn, expected):
     assert result == pytest.approx(expected, rel=1e-10)
 
 
+@pytest.mark.parametrize("fn,expected", [
+    (vp.C_ell_Phi,     6.144557175246948e-15),
+    (vp.C_ell_B,       2.116050527317594e-24),
+    (vp.C_ell_kSZ,     2.1552296011290954e-27),
+    (vp.C_ell_B_X_kSZ, 5.462413350965035e-26),
+])
+def test_c_ell_baseline_unchanged_quad(fn, expected):
+    """Pin each C_ell function's quad output. Catches drift in the scalar
+    `kernel_fn(np.asarray(x), ...)` branch that test_c_ell_baseline_unchanged
+    (simpson) does not exercise."""
+    result = fn(**COMMON_KWARGS, integr_method="quad")
+    assert result == pytest.approx(expected, rel=1e-10)
+
+
 # ---------------------------------------------------------------------------
 # build_cosmo_params_from_file — h propagation
 # ---------------------------------------------------------------------------
