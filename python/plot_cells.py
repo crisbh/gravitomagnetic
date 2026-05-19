@@ -18,19 +18,34 @@ import matplotlib.pyplot as plt
 import numpy as np
 from plot_utils import MODEL_COLORS, MODEL_LABELS, MODEL_LS, apply_style
 
+QUANTITIES = ("Phi", "B", "kSZ", "B_X_kSZ")
+
 CELL_LABELS = {
-    "B_X_kSZ": r"$C_\ell^{B \times \mathrm{kSZ}}$",
     "Phi": r"$C_\ell^{\kappa\kappa}$",
+    "B": r"$C_\ell^{BB}$",
+    "kSZ": r"$C_\ell^{\mathrm{kSZ}\,\mathrm{kSZ}}$",
+    "B_X_kSZ": r"$C_\ell^{B \times \mathrm{kSZ}}$",
 }
 
 CELL_TITLES = {
-    "B_X_kSZ": r"$B \times \mathrm{kSZ}$ cross-spectrum",
     "Phi": r"Lensing convergence $\kappa\kappa$",
+    "B": r"Gravitomagnetic $BB$",
+    "kSZ": r"kSZ auto-spectrum",
+    "B_X_kSZ": r"$B \times \mathrm{kSZ}$ cross-spectrum",
 }
 
 CELL_RATIO_LABELS = {
-    "B_X_kSZ": r"$C_\ell^{B \times \mathrm{kSZ}} \,/\, C_\ell^{B \times \mathrm{kSZ},\,\Lambda\mathrm{CDM}}$",
     "Phi": r"$C_\ell^{\kappa\kappa} \,/\, C_\ell^{\kappa\kappa,\,\Lambda\mathrm{CDM}}$",
+    "B": r"$C_\ell^{BB} \,/\, C_\ell^{BB,\,\Lambda\mathrm{CDM}}$",
+    "kSZ": r"$C_\ell^{\mathrm{kSZ}\,\mathrm{kSZ}} \,/\, C_\ell^{\mathrm{kSZ}\,\mathrm{kSZ},\,\Lambda\mathrm{CDM}}$",
+    "B_X_kSZ": r"$C_\ell^{B \times \mathrm{kSZ}} \,/\, C_\ell^{B \times \mathrm{kSZ},\,\Lambda\mathrm{CDM}}$",
+}
+
+CELL_RATIO_TITLES = {
+    "Phi": r"Lensing $\kappa\kappa$ ratio",
+    "B": r"$BB$ ratio",
+    "kSZ": r"kSZ ratio",
+    "B_X_kSZ": r"$B \times \mathrm{kSZ}$ ratio",
 }
 
 
@@ -57,6 +72,13 @@ def parse_args():
         default=["lcdm", "frhs", "ndgp"],
         choices=["lcdm", "frhs", "ndgp"],
     )
+    parser.add_argument(
+        "--quantities",
+        nargs="+",
+        default=list(QUANTITIES),
+        choices=list(QUANTITIES),
+        help="Which C_ell quantities to plot (one panel each).",
+    )
     parser.add_argument("--show", action="store_true")
     return parser.parse_args()
 
@@ -82,12 +104,32 @@ def z_colormap(z_values):
     return {z: cmap(norm(z)) for z in z_values}
 
 
-def plot_absolute(data, z_sources, models, out_dir, show):
-    z_colors = z_colormap(z_sources)
-    quantities = ["B_X_kSZ", "Phi"]
+def _make_axes(n_panels):
+    """Layout for N panels: 1xN row (N<=4 covers our use case)."""
+    fig, axes = plt.subplots(1, n_panels, figsize=(4 * n_panels, 4), squeeze=False)
+    return fig, axes[0]
 
-    fig, axes = plt.subplots(1, 2, figsize=(8, 4))
-    model_handles, z_handles = [], []
+
+def _model_legend_handles(models):
+    return [
+        plt.Line2D([0], [0], ls=MODEL_LS[m], color="0.3", label=MODEL_LABELS[m])
+        for m in models
+    ]
+
+
+def _z_legend_handles(z_sources, z_colors, data, ref_model):
+    handles = []
+    for z in z_sources:
+        if z in data[ref_model]:
+            handles.append(
+                plt.Line2D([0], [0], ls="-", color=z_colors[z], label=rf"$z_s={z:.1f}$")
+            )
+    return handles
+
+
+def plot_absolute(data, z_sources, models, quantities, out_dir, show):
+    z_colors = z_colormap(z_sources)
+    fig, axes = _make_axes(len(quantities))
 
     for ax, qty in zip(axes, quantities):
         for model in models:
@@ -107,29 +149,15 @@ def plot_absolute(data, z_sources, models, out_dir, show):
         ax.set_ylabel(CELL_LABELS[qty])
         ax.set_title(CELL_TITLES[qty])
 
-        if qty == quantities[0]:
-            for model in models:
-                model_handles.append(
-                    plt.Line2D(
-                        [0],
-                        [0],
-                        ls=MODEL_LS[model],
-                        color="0.3",
-                        label=MODEL_LABELS[model],
-                    )
-                )
-        if qty == quantities[-1] and models:
-            first = models[0]
-            for z in z_sources:
-                if z in data[first]:
-                    z_handles.append(
-                        plt.Line2D(
-                            [0], [0], ls="-", color=z_colors[z], label=rf"$z_s={z:.1f}$"
-                        )
-                    )
-
-    axes[0].legend(handles=model_handles, loc="lower left", title="Model")
-    axes[1].legend(handles=z_handles, loc="lower left", title="Source $z$")
+    if models:
+        axes[0].legend(
+            handles=_model_legend_handles(models), loc="lower left", title="Model"
+        )
+    if len(axes) > 1 and models:
+        axes[-1].legend(
+            handles=_z_legend_handles(z_sources, z_colors, data, models[0]),
+            loc="lower left", title="Source $z$",
+        )
 
     plt.tight_layout()
     out = Path(out_dir) / "cells_absolute.pdf"
@@ -140,7 +168,7 @@ def plot_absolute(data, z_sources, models, out_dir, show):
     plt.close(fig)
 
 
-def plot_ratio(data, z_sources, models, out_dir, show):
+def plot_ratio(data, z_sources, models, quantities, out_dir, show):
     if "lcdm" not in models:
         print("Skipping ratio plot — lcdm not in selected models.")
         return
@@ -149,13 +177,9 @@ def plot_ratio(data, z_sources, models, out_dir, show):
         return
 
     z_colors = z_colormap(z_sources)
-    quantities = ["B_X_kSZ", "Phi"]
-
-    fig, axes = plt.subplots(1, 2, figsize=(8, 4))
+    fig, axes = _make_axes(len(quantities))
     for ax in axes:
         ax.axhline(1.0, color="0.5", lw=0.8, ls="--")
-
-    model_handles, z_handles = [], []
 
     for ax, qty in zip(axes, quantities):
         for model in other_models:
@@ -173,32 +197,16 @@ def plot_ratio(data, z_sources, models, out_dir, show):
 
         ax.set_xlabel(r"$\ell$")
         ax.set_ylabel(CELL_RATIO_LABELS[qty])
+        ax.set_title(CELL_RATIO_TITLES[qty])
 
-        if qty == quantities[0]:
-            for model in other_models:
-                model_handles.append(
-                    plt.Line2D(
-                        [0],
-                        [0],
-                        ls=MODEL_LS[model],
-                        color="0.3",
-                        label=MODEL_LABELS[model],
-                    )
-                )
-        if qty == quantities[-1] and other_models:
-            first = other_models[0]
-            for z in z_sources:
-                if z in data[first]:
-                    z_handles.append(
-                        plt.Line2D(
-                            [0], [0], ls="-", color=z_colors[z], label=rf"$z_s={z:.1f}$"
-                        )
-                    )
-
-    axes[0].set_title(r"$B \times \mathrm{kSZ}$ ratio")
-    axes[1].set_title(r"Lensing $\kappa\kappa$ ratio")
-    axes[0].legend(handles=model_handles, loc="upper left", title="Model")
-    axes[1].legend(handles=z_handles, loc="upper left", title="Source $z$")
+    axes[0].legend(
+        handles=_model_legend_handles(other_models), loc="upper left", title="Model"
+    )
+    if len(axes) > 1:
+        axes[-1].legend(
+            handles=_z_legend_handles(z_sources, z_colors, data, other_models[0]),
+            loc="upper left", title="Source $z$",
+        )
 
     plt.tight_layout()
     out = Path(out_dir) / "cells_ratio.pdf"
@@ -222,8 +230,8 @@ def main():
     print("Loading C_ell data...")
     data = {m: load_cells(base, m, z_sources) for m in args.models}
 
-    plot_absolute(data, z_sources, args.models, out_dir, args.show)
-    plot_ratio(data, z_sources, args.models, out_dir, args.show)
+    plot_absolute(data, z_sources, args.models, args.quantities, out_dir, args.show)
+    plot_ratio(data, z_sources, args.models, args.quantities, out_dir, args.show)
 
 
 if __name__ == "__main__":
