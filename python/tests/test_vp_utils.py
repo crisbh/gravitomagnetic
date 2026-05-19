@@ -55,6 +55,61 @@ def test_n_ele_positive():
     assert np.all(vp.n_ele(z) > 0)
 
 
+@pytest.mark.parametrize("z,expected", [
+    (0.1, 0.00021496741731112884),
+    (0.5, 0.0013648064155136865),
+    (1.0, 0.003354239026127417),
+    (1.5, 0.0058137642910988845),
+    (2.0, 0.008642092092724431),
+    (3.0, 0.01518486074671854),
+    (5.0, 0.03107597093289381),
+])
+def test_tau_optical_depth_baseline(z, expected):
+    """Pin tau(z) against the interpolator output under the conftest mock cosmology.
+    Locks in the current implementation; rel=1e-10 allows only float-associativity drift."""
+    assert float(vp.tau_optical_depth(z)) == pytest.approx(expected, rel=1e-10)
+
+
+def test_tau_optical_depth_monotone():
+    z = np.linspace(0.05, 5.0, 50)
+    tau = vp.tau_optical_depth(z)
+    assert np.all(np.diff(tau) > 0)
+
+
+# ---------------------------------------------------------------------------
+# Lazy parameters_sim resolution
+# ---------------------------------------------------------------------------
+
+def test_load_parameters_sim_errors_without_env(monkeypatch):
+    """If neither set_parameters_sim has been called nor VP_PARAMS_FILE is set,
+    accessing parameters_sim raises a clear RuntimeError."""
+    monkeypatch.delenv("VP_PARAMS_FILE", raising=False)
+    monkeypatch.setattr(vp, "_parameters_sim_cache", None)
+    with pytest.raises(RuntimeError, match="VP_PARAMS_FILE"):
+        vp._load_parameters_sim()
+
+
+def test_set_parameters_sim_invalidates_caches(monkeypatch, tmp_path):
+    """set_parameters_sim must reset the chi and tau interpolators so they
+    rebuild against the new cosmology on next access."""
+    cached_chi = vp._chi_interp
+    cached_tau = vp._tau_interp
+    # Trigger build of both if not already populated
+    _ = vp.chi_of_z(1.0)
+    _ = vp.tau_optical_depth(1.0)
+    assert vp._chi_interp is not None and vp._tau_interp is not None
+
+    # Inject a slightly different cosmology and verify caches were cleared
+    new_pars = dict(vp._load_parameters_sim())
+    vp.set_parameters_sim(new_pars)
+    assert vp._chi_interp is None
+    assert vp._tau_interp is None
+
+    # Restore the original interpolators so we don't pollute later tests
+    vp._chi_interp = cached_chi
+    vp._tau_interp = cached_tau
+
+
 # ---------------------------------------------------------------------------
 # ValueError for invalid integration method
 # ---------------------------------------------------------------------------

@@ -1,13 +1,14 @@
 """
 conftest.py — pytest configuration for the python/tests suite.
 
-vp_utils.py reads a COSMA-specific parameters file at module level.  We intercept
-Path.exists and Path.open for that one path before importing so the module loads
-cleanly in CI and local environments that don't have the simulation data.
+vp_utils.parameters_sim is now resolved lazily and accepts an explicit
+override via set_parameters_sim().  We inject a fiducial cosmology here so
+tests run without needing the real Arepo parameters-usedvalues file (or
+the VP_PARAMS_FILE environment variable).
 """
 
 import sys
-from io import StringIO
+import tempfile
 from pathlib import Path
 
 # Make sure `python/` is importable
@@ -24,26 +25,12 @@ _PARAMS_CONTENT = (
     "UnitVelocity_in_cm_per_s 100000.0\n"
 )
 
-_orig_path_open = Path.open
-_orig_path_exists = Path.exists
+with tempfile.NamedTemporaryFile(
+    mode="w", suffix="-parameters-usedvalues", delete=False
+) as _f:
+    _f.write(_PARAMS_CONTENT)
+    _MOCK_PARAMS_PATH = _f.name
 
+import vp_utils
 
-def _patched_path_open(self, *args, **kwargs):
-    if "parameters-usedvalues" in str(self):
-        return StringIO(_PARAMS_CONTENT)
-    return _orig_path_open(self, *args, **kwargs)
-
-
-def _patched_path_exists(self):
-    if "parameters-usedvalues" in str(self):
-        return True
-    return _orig_path_exists(self)
-
-
-Path.open = _patched_path_open
-Path.exists = _patched_path_exists
-try:
-    import vp_utils  # noqa: F401 — triggers module-level build with mock data
-finally:
-    Path.open = _orig_path_open
-    Path.exists = _orig_path_exists
+vp_utils.set_parameters_sim(_MOCK_PARAMS_PATH)
