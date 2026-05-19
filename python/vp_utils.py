@@ -115,38 +115,82 @@ def build_cosmo_params_from_file(path, extra_defaults=None):
 
 import os as _os
 
-"""
-NOTE:
-    parameters_sim is loaded once at import time from the Arepo
-    parameters-usedvalues file of the model being processed.
-
-    The file is selected via the VP_PARAMS_FILE environment variable.
-    Every script that imports vp_utils must set this variable to the
-    parameters file of the model it is computing (lcdm, frhs, or ndgp).
-    IMPORTANT: Using the wrong file silently propagates incorrect h, Omega_m, etc.
-    into all cosmological background functions and the k/Pk unit conversion in powerspec.py.
-
-    Example usage:
-      export VP_PARAMS_FILE=output/frhs/parameters-usedvalues
-      python powerspec.py --in-dir output/frhs/seed_2080/snap_000 ...
-
-    The default setting falls back to a COSMA-specific path and is only correct
-    for lcdm. It will not exist on other machines.
-"""
-
-base_path = Path("~/nerding/gravitomagnetic/output").expanduser()
-
-_default_params = str(base_path / "lcdm/parameters-usedvalues")
-_params_file = Path(_os.environ.get("VP_PARAMS_FILE", _default_params))
-parameters_sim = build_cosmo_params_from_file(_params_file)
+# ============================================================================
+# Cosmological parameters
+# ============================================================================
+#
+# `parameters_sim` is the dict of cosmological parameters for the model
+# currently being processed.  It is resolved lazily on first access via
+# a module-level __getattr__ — importing vp_utils no longer requires
+# VP_PARAMS_FILE to be set; only *using* anything that needs cosmology does.
+#
+# Resolution order on first access:
+#   1. If a caller has injected parameters via set_parameters_sim(...), use those.
+#   2. Otherwise read the path in the VP_PARAMS_FILE environment variable.
+#   3. If neither is set, raise RuntimeError — there is no silent fallback.
+#
+# IMPORTANT: using the wrong VP_PARAMS_FILE silently propagates incorrect h,
+# Omega_m, etc.  Set it explicitly per script invocation:
+#
+#     export VP_PARAMS_FILE=output/frhs/parameters-usedvalues
+#     python powerspec.py --in-dir output/frhs/seed_2080/snap_000 ...
 
 
-parameters_sim["w_de"] = -1
-parameters_sim["khN"] = 1024 / 500 * np.pi
-parameters_sim["kN"] = parameters_sim["khN"] * parameters_sim["h"]
+_parameters_sim_cache = None
 
-parameters_sim["khF"] = 1 / 500
-parameters_sim["kF"] = parameters_sim["khF"] * parameters_sim["h"]
+
+def _augment_params(params):
+    """Add the derived constants the pipeline expects (w_de, kF/kN modes)."""
+    params["w_de"] = -1
+    params["khN"] = 1024 / 500 * np.pi
+    params["kN"] = params["khN"] * params["h"]
+    params["khF"] = 1 / 500
+    params["kF"] = params["khF"] * params["h"]
+    return params
+
+
+def _load_parameters_sim():
+    """Resolve and cache the cosmological parameters dict."""
+    global _parameters_sim_cache
+    if _parameters_sim_cache is not None:
+        return _parameters_sim_cache
+    path = _os.environ.get("VP_PARAMS_FILE")
+    if not path:
+        raise RuntimeError(
+            "VP_PARAMS_FILE environment variable is not set. "
+            "Point it at the parameters-usedvalues file of the model you are "
+            "processing, e.g.\n"
+            "  export VP_PARAMS_FILE=output/lcdm/parameters-usedvalues\n"
+            "Or call vp_utils.set_parameters_sim(path_or_dict) explicitly."
+        )
+    _parameters_sim_cache = _augment_params(build_cosmo_params_from_file(Path(path)))
+    return _parameters_sim_cache
+
+
+def set_parameters_sim(params_or_path):
+    """Override the cached cosmological parameters.
+
+    Accepts either a fully-built params dict (typical in tests) or a path
+    to an Arepo parameters-usedvalues file.  Subsequent accesses to
+    `parameters_sim` and the chi/tau interpolators will rebuild against the
+    new values.
+    """
+    global _parameters_sim_cache, _chi_interp, _tau_interp
+    if isinstance(params_or_path, dict):
+        _parameters_sim_cache = _augment_params(dict(params_or_path))
+    else:
+        _parameters_sim_cache = _augment_params(
+            build_cosmo_params_from_file(Path(params_or_path))
+        )
+    # Invalidate dependent caches so they rebuild against the new cosmology
+    _chi_interp = None
+    _tau_interp = None
+
+
+def __getattr__(name):
+    if name == "parameters_sim":
+        return _load_parameters_sim()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 ######################
 # Cosmo Background functions
@@ -154,48 +198,48 @@ parameters_sim["kF"] = parameters_sim["khF"] * parameters_sim["h"]
 
 
 def a_of_z(z):
-    """
-    Scale factor as a function of redshift.
-    """
+    """Scale factor as a function of redshift."""
     return 1 / (1 + z)
 
 
 def z_of_a(a):
-    """
-    Redshift as a function of the scale factor.
-    """
+    """Redshift as a function of the scale factor."""
     return 1 / a - 1
 
 
-def Hubble(z, pars=parameters_sim):
-    """
-    Hubble parameter in km/s/Mpc for wCDM.
-    """
-    # CLASS['const_z'].Omega_r()*(1.+z)**4 +
-    H = pars["H0"] * np.sqrt(
+def Hubble(z, pars=None):
+    """Hubble parameter in km/s/Mpc for wCDM."""
+    if pars is None:
+        pars = _load_parameters_sim()
+    return pars["H0"] * np.sqrt(
         pars["Omega_m"] * (1.0 + z) ** 3
         + (1.0 - pars["Omega_m"]) * (1.0 + z) ** (3 * (1 + pars["w_de"]))
     )
-    return H
 
 
-z_table = np.linspace(0, 1080, 10000)
-chi_table = np.zeros_like(z_table)
+# chi(z) and tau(z) are precomputed onto z-grids and accessed via cubic
+# interpolation.  Both depend on cosmology, so the interpolators are built
+# lazily on first call (and invalidated by set_parameters_sim).
+_chi_interp = None
+_tau_interp = None
 
-pars = parameters_sim
-integrand = lambda x: 1 / Hubble(x, pars=parameters_sim)
 
-for i, zz in enumerate(z_table):
-    chi_table[i] = quad(integrand, 0, zz)[0] * pars["c"]
-
-chi_interp = interp1d(z_table, chi_table, kind="cubic", fill_value="extrapolate")
+def _build_chi_interp():
+    pars = _load_parameters_sim()
+    z_table = np.linspace(0, 1080, 10000)
+    chi_table = np.empty_like(z_table)
+    integrand = lambda x: 1 / Hubble(x, pars=pars)
+    for i, zz in enumerate(z_table):
+        chi_table[i] = quad(integrand, 0, zz)[0] * pars["c"]
+    return interp1d(z_table, chi_table, kind="cubic", fill_value="extrapolate")
 
 
 def chi_of_z(z):
-    """
-    Comoving distance as a function in redshift χ(z), in Mpc.
-    """
-    return chi_interp(z)
+    """Comoving distance as a function of redshift χ(z), in Mpc."""
+    global _chi_interp
+    if _chi_interp is None:
+        _chi_interp = _build_chi_interp()
+    return _chi_interp(z)
 
 
 # =============================================
@@ -203,48 +247,52 @@ def chi_of_z(z):
 # =============================================
 
 
-def n_ele(z, pars=parameters_sim):
-    """
-    Electron number density n_e = n_H + 2*n_He, in 1/m^3
-    """
-    n_H = (
-        (1 - pars["Yp"])
-        * ((pars["Ombh2"] / pars["h"] ** 2) * pars["rho_c"])
-        / pars["m_H"]
-        * (1 + z) ** 3
+def n_ele(z, pars=None):
+    """Electron number density n_e = n_H + 2 n_He, in 1/m^3."""
+    if pars is None:
+        pars = _load_parameters_sim()
+    common = (pars["Ombh2"] / pars["h"] ** 2) * pars["rho_c"] * (1 + z) ** 3
+    n_H = (1 - pars["Yp"]) * common / pars["m_H"]
+    n_He = pars["Yp"] * common / pars["m_He"]
+    return n_H + 2 * n_He
+
+
+# Optical depth tau(z) = int_0^z SigmaT * c * Mpc_2_m * n_e(x) / (1+x) / H(x) dx.
+# Built lazily as a precomputed z-grid + cubic interp (same pattern as chi_of_z)
+# to avoid running scipy.quad per call inside the kSZ / B x kSZ kernels.
+_TAU_Z_MAX = 10.0
+_TAU_NGRID = 4000
+
+
+def _build_tau_interp():
+    pars = _load_parameters_sim()
+    z_grid = np.linspace(0, _TAU_Z_MAX, _TAU_NGRID)
+    integrand = (
+        lambda x: pars["SigmaT"] * pars["c"] * Mpc_2_m
+        * n_ele(x, pars) / (1 + x) / Hubble(x, pars)
     )
-    n_He = (
-        pars["Yp"]
-        * ((pars["Ombh2"] / pars["h"] ** 2) * pars["rho_c"])
-        / pars["m_He"]
-        * (1 + z) ** 3
-    )
-    n_ele = n_H + 2 * n_He
-    return n_ele
+    tau_table = np.empty_like(z_grid)
+    for i, zz in enumerate(z_grid):
+        tau_table[i] = quad(integrand, 0, zz)[0]
+    return interp1d(z_grid, tau_table, kind="cubic", fill_value="extrapolate")
 
 
-def tau_optical_depth(z, pars=parameters_sim):
-    """
-    [tau] = dimensionless
-    Integration in terms of dz=H*dr
-    """
-    tau_optical_depth_int = (
-        lambda x: pars["SigmaT"]
-        * pars["c"]
-        * Mpc_2_m
-        * n_ele(x, pars)
-        / (1 + x)
-        / Hubble(x, pars)
-    )
-    return quad(tau_optical_depth_int, 0, z)[0]
-
-
-tau_optical_depth = np.vectorize(tau_optical_depth)
+def tau_optical_depth(z):
+    """Optical depth to Thomson scattering, tau(z), dimensionless."""
+    global _tau_interp
+    if _tau_interp is None:
+        _tau_interp = _build_tau_interp()
+    return _tau_interp(z)
 
 
 # =====================
 # Angular power spectra
 # =====================
+
+
+def _resolve_pars(pars):
+    """Resolve a pars argument: None -> lazy load of the module-level cosmology."""
+    return _load_parameters_sim() if pars is None else pars
 
 
 def _compute_C_ell(
@@ -258,7 +306,7 @@ def _compute_C_ell(
     name="C_ell",
     z_min=1e-5,
     Pk_evol=True,
-    pars=parameters_sim,
+    pars=None,
     N_int=int(1e4),
     integr_method="simpson",
 ):
@@ -271,6 +319,7 @@ def _compute_C_ell(
     drives every integration method i.e. there is no separate hand-written
     integrand to keep in sync.
     """
+    pars = _resolve_pars(pars)
 
     z_grid = np.geomspace(z_min, z_s, N_int)
     chi_grid = chi_of_z(z_grid)
@@ -320,7 +369,7 @@ def C_ell_Phi(
     Pk,
     z_min=1e-5,
     Pk_evol=True,
-    pars=parameters_sim,
+    pars=None,
     N_int=int(1e4),
     integr_method="simpson",
 ):
@@ -366,6 +415,8 @@ def C_ell_Phi(
         C_ell^{kappa kappa} [dimensionless].
     """
 
+    pars = _resolve_pars(pars)
+
     def kernel(z, chi, chi_s, ell, pars):
         return (chi / chi_s - 1) ** 2 * (1 + z) ** 2 / Hubble(z, pars)
 
@@ -397,7 +448,7 @@ def C_ell_B(
     Pk,
     z_min=1e-5,
     Pk_evol=True,
-    pars=parameters_sim,
+    pars=None,
     N_int=int(1e4),
     integr_method="simpson",
 ):
@@ -444,6 +495,8 @@ def C_ell_B(
         C_ell^{BB} [(km/s)^2 Mpc^2] (units inherited from P_q).
     """
 
+    pars = _resolve_pars(pars)
+
     def kernel(z, chi, chi_s, ell, pars):
         lens = (chi / chi_s - 1) ** 2 * (1 + z) ** 2 / Hubble(z, pars)
         return 0.5 * lens / (ell / chi) ** 2  # 1/2 from P_q; 1/k^2 -> P_q_perp
@@ -476,7 +529,7 @@ def C_ell_kSZ(
     Pk,
     z_min=1e-5,
     Pk_evol=True,
-    pars=parameters_sim,
+    pars=None,
     N_int=int(1e4),
     integr_method="simpson",
 ):
@@ -523,6 +576,8 @@ def C_ell_kSZ(
         C_ell^{kSZ kSZ} [dimensionless, in units of (Delta T / T)^2 * sr].
     """
 
+    pars = _resolve_pars(pars)
+
     def kernel(z, chi, chi_s, ell, pars):
         thomson = (
             pars["SigmaT"]
@@ -558,7 +613,7 @@ def C_ell_B_X_kSZ(
     Pk,
     z_min=1e-5,
     Pk_evol=True,
-    pars=parameters_sim,
+    pars=None,
     N_int=int(1e4),
     integr_method="simpson",
 ):
@@ -608,6 +663,8 @@ def C_ell_B_X_kSZ(
         C_ell^{B x kSZ} in mixed units [(km/s) * (Delta T / T) * Mpc * sr^{1/2}].
     """
 
+    pars = _resolve_pars(pars)
+
     def kernel(z, chi, chi_s, ell, pars):
         weight = (
             n_ele(z, pars)
@@ -650,7 +707,7 @@ def C_ell_XY(
     type_XY,
     z_min=1e-5,
     Pk_evol=True,
-    pars=parameters_sim,
+    pars=None,
     N_int=int(1e4),
     integr_method="simpson",
 ):
