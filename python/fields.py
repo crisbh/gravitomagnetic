@@ -24,7 +24,7 @@ def parse_args():
     parser.add_argument("--mas", default="CIC", help="Mass assignment scheme.")
     parser.add_argument("--threads", type=int, default=1, help="Number of threads for Pk computation.")
     parser.add_argument("--out-dir", default="outputs", help="Output directory for .npy files.")
-    parser.add_argument("--verbose", type=bool, help="Enable verbose Pylians output.")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose Pylians output.")
     return parser.parse_args()
 
 
