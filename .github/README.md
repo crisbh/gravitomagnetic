@@ -93,12 +93,6 @@ python3 python/SNR.py --in-dir output --out-dir output \
 
 Loops over $z_\mathrm{source} \in [0.5, 3.0]$ and survey/experiment combinations are in `scripts/run_cells_z.sh` and `scripts/run_snrs.sh`. Argument details are exposed via `--help` on each script.
 
-The Limber integrand for SNR is
-
-$$\mathrm{SNR}_\ell^2 = \frac{(2\ell+1) f_\mathrm{sky} \left[C_\ell^{B \times \mathrm{kSZ}}\right]^2}{C_\ell^{BB,\mathrm{tot}} \cdot C_\ell^{kSZ,\mathrm{tot}}}$$
-
-with hardcoded survey noise (Euclid: $n_g=30/\mathrm{arcmin}^2$, $\sigma_e=0.297$, $f_\mathrm{sky}=0.36$; LSST: $40/\mathrm{arcmin}^2$, $\sigma_e=0.22$, $f_\mathrm{sky}=0.5$) and CMB instrument noise (Planck: $5'$ FWHM, $3.1\,\mu$K; SO: $1.4'$ FWHM, $6\,\mu$K).
-
 ---
 
 ## Plotting
