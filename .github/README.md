@@ -1,5 +1,7 @@
 # Gravitomagnetic lensing x kSZ Pipeline
 
+[![tests](https://github.com/crisbh/gravitomagnetic/actions/workflows/tests.yml/badge.svg)](https://github.com/crisbh/gravitomagnetic/actions/workflows/tests.yml)
+
 Pipeline computing the signal-to-noise ratio (SNR) for detecting the cosmological **gravitomagnetic field B** (vector-mode, frame-dragging component of the metric) via the cross-correlation of weak-lensing convergence ($\kappa$) and the kinetic Sunyaev-Zel'dovich (kSZ) effect on the CMB, for $\Lambda$CDM, Hu-Sawicki $f(R)$ and nDGP modified gravity.
 
 The detection statistic is $C_\ell^{B \times \mathrm{kSZ}}$. The gravitomagnetic field is sourced by the transverse (curl) component of the momentum field $\mathbf{q} = (1+\delta)\mathbf{v}$, which also sources kSZ — hence the cross-correlation.
